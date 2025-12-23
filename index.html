@@ -30,14 +30,17 @@
   background: black;
 }
   #overlayImage {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: none;
-  }
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  background: black;
+}
+
   .progress-container {
     position: relative;
     z-index: 2001;
@@ -172,6 +175,15 @@
 </div>
 
 <script>
+let carFinishAngle = 0;
+let carFinishSpeed = 8;
+let carSpeed = 10;
+  const hornSound = new Audio('horn.mp3');
+hornSound.volume = 0.6;
+hornSound.preload = 'auto';
+let hornCooldown = false;
+let hornPulse = 0;
+  let lastTime = performance.now();
   let carFinishAnimation = false;
   let explosions = [];
 const canvas = document.getElementById('game');
@@ -272,16 +284,6 @@ function activateShield(){
 }
 
 // Стрільба
-canvas.addEventListener('click', e=>{
-  if(!gameStarted||isPaused||!canShoot||isCarLevel) return;
-  const rect=canvas.getBoundingClientRect();
-  const mouseX=e.clientX-rect.left;
-  const mouseY=e.clientY-rect.top;
-  const angle=Math.atan2(mouseY-player.y, mouseX-player.x);
-  bullets.push({ x:player.x, y:player.y, dx:Math.cos(angle)*5, dy:Math.sin(angle)*5 });
-  canShoot=false;
-  setTimeout(()=>{ canShoot=true; }, shootCooldown);
-});
 
 // Клавіші
 document.addEventListener('keydown', e=>{ if(!isPaused) keys[e.key]=true; });
@@ -435,51 +437,43 @@ function damagePlayer(){
 
 // Game over екран
 function showGameOver(){
-  isPaused=true;
-  
-  overlayVideo.style.display='none';
-  overlayGif.style.display='none';
-  
-if(isCarLevel){
-  overlayImage.src = 'zdochbogdan.jpg';
-}
-else if(checkpointReached || currentBg === bgImg3){
-  overlayImage.src = 'bogdanzabka.jpg';
-}
-else{
-  overlayImage.src = 'bogdanberemenen.webp';
-}
-  
-  overlayImage.style.display='block';
-  progressContainer.style.display='block';
-  
-  progressBar.style.animation='none';
-  progressBar.style.width='0%';
-  setTimeout(()=>{
-    progressBar.style.animation='progressAnimation 3s linear forwards';
+  isPaused = true;
+
+  overlayVideo.style.display = 'none';
+  overlayGif.style.display = 'none';
+
+  if (isCarLevel) {
+    overlayImage.src = 'zdochbogdan.jpg';
+  } else if (checkpointReached || currentBg === bgImg3) {
+    overlayImage.src = 'bogdanzabka.jpg';
+  } else {
+    overlayImage.src = 'bogdanberemenen.webp';
+  }
+
+  overlayImage.style.display = 'block';
+  progressContainer.style.display = 'block';
+
+  progressBar.style.animation = 'none';
+  progressBar.style.width = '0%';
+
+  setTimeout(() => {
+    progressBar.style.animation = 'progressAnimation 1.5s linear forwards';
   }, 10);
-  
+
   overlayScreen.classList.add('show');
-  
-  setTimeout(()=>{
+
+  setTimeout(() => {
     overlayScreen.classList.remove('show');
-    overlayImage.style.display='none';
-    progressContainer.style.display='none';
-    isPaused=false;
-    
-    console.log('Чекпоїнт:', checkpointReached, 'Авто рівень:', isCarLevel);
-    if(checkpointReached && isCarLevel){
-      console.log('Повертаємося на чекпоїнт!');
+    overlayImage.style.display = 'none';
+    progressContainer.style.display = 'none';
+    isPaused = false;
+
+    if (checkpointReached && isCarLevel) {
       respawnAtCheckpoint();
     } else {
-      console.log('Повний рестарт');
-      if(checkpoint.active){
-  respawnFromCheckpoint();
-} else {
-  resetGame();
-}
+      checkpoint.active ? respawnFromCheckpoint() : resetGame();
     }
-  },3000);
+  }, 1500);
 }
 
 // Повернення на чекпоїнт (3 локація без боса)
@@ -826,189 +820,45 @@ function updateBoss(){
 }
 
 // Оновлення авто рівня
-function updateCarLevel(){
-  if(!carLevelStarted) return;
-  
-  if(keys['w']||keys['W']||keys['ArrowUp']) player.y -= player.speed;
-  if(keys['s']||keys['S']||keys['ArrowDown']) player.y += player.speed;
-  
-  if(player.y < player.h/2) player.y = player.h/2;
-  if(player.y > canvas.height - player.h/2) player.y = canvas.height - player.h/2;
-  
-  carScrollOffset += 8;
-  carLevelDistance += 8;
-  
-  for(let i = roadCars.length - 1; i >= 0; i--){
-    let car = roadCars[i];
-    car.x -= car.speed + 5;
+function updateCarLevel() {
+  carLevelDistance += carSpeed;
 
-    // Запобігання наїзду машин одна на одну
-    for(let j = 0; j < roadCars.length; j++){
-      if(i === j) continue;
-      const other = roadCars[j];
-      const overlapX = car.x + car.hitboxW/2 > other.x - other.hitboxW/2 &&
-                       car.x - car.hitboxW/2 < other.x + other.hitboxW/2;
-      const overlapY = car.y + car.hitboxH/2 > other.y - other.hitboxH/2 &&
-                       car.y - car.hitboxH/2 < other.y + other.hitboxH/2;
-      if(overlapX && overlapY){
-        car.x += 10; // відштовхування
-      }
-    }
-    
-    if(!player.hasShield && !player.invulnerable){
-      const hitX = player.x + player.hitboxW/2 > car.x - car.hitboxW/2 &&
-                   player.x - player.hitboxW/2 < car.x + car.hitboxW/2;
-      const hitY = player.y + player.hitboxH/2 > car.y - car.hitboxH/2 &&
-                   player.y - player.hitboxH/2 < car.y + car.hitboxH/2;
-      if(hitX && hitY){
-        spawnExplosion(player.x, player.y);
-        showGameOver();
-      }
-    }
+  if (!carFinishAnimation) {
+    if (keys.ArrowLeft) player.x -= 4;
+    if (keys.ArrowRight) player.x += 4;
+  }
 
-    // Перезапуск машин після виходу за межі екрану
-    if(car.x < -car.w){
-      roadCars.splice(i, 1);
-      roadCars.push({
-        x: canvas.width + 400 + Math.random() * 300,
-        y: Math.random() * (canvas.height - 200) + 100,
-        w: 120,
-        h: 80,
-        hitboxW: 100, // збільшений хітбокс
-        hitboxH: 70,
-        speed: 3 + Math.random() * 2,
-        color: car.color,
-        type: car.type,
-        sirenPhase: 0
-      });
-    }
-  }
-  
-  if(player.hasShield){
-    player.shieldTime--;
-    if(player.shieldTime <= 0) player.hasShield = false;
-  }
-  
-  if(player.invulnerable){
-    player.invulnerableTime--;
-    if(player.invulnerableTime <= 0) player.invulnerable = false;
-  }
-  
-  // Завершення рівня та анімація обочини
-  if(carLevelDistance >= CAR_LEVEL_WIN_DISTANCE){
+  player.x = Math.max(60, Math.min(canvas.width - 60, player.x));
+
+  if (carLevelDistance >= CAR_LEVEL_WIN_DISTANCE) {
     carFinishAnimation = true;
   }
-  
-  if(carFinishAnimation){
-    // Анімація “з’їзду” на обочину
-    player.y += 2; 
-    player.x += 2; 
-    if(player.y > canvas.height + 200){
-      carFinishAnimation = false;
-      currentBg = bgImg2;
-      isCarLevel = false;
-      player.x = canvas.width/2;
-      player.y = canvas.height/2;
-      carLevelDistance = 0;
+
+  // 🔥 ФІНІШ (ВАРІАНТ A)
+  if (carFinishAnimation) {
+    player.x += Math.cos(carFinishAngle) * carFinishSpeed;
+    player.y += Math.sin(carFinishAngle) * carFinishSpeed;
+
+    carFinishAngle += 0.02;
+    carFinishSpeed *= 0.96;
+
+    if (carFinishSpeed < 0.4) {
+      finishCarLevel();
     }
   }
 }
 
-// Малювання авто рівня
-function drawCarLevel(){
-  ctx.fillStyle = '#555';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // Дорога
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 4;
-  ctx.setLineDash([40, 20]);
-  for(let i = -1; i < 3; i++){
-    const yPos = canvas.height / 3 * (i + 1);
-    ctx.beginPath();
-    ctx.moveTo(-carScrollOffset % 60, yPos);
-    ctx.lineTo(canvas.width, yPos);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
+function finishCarLevel() {
+  carFinishAnimation = false;
+  isCarLevel = false;
 
-  // Малювання машин
-  roadCars.forEach(car=>{
-    // кузов
-    ctx.fillStyle = car.color;
-    ctx.fillRect(car.x - car.w/2, car.y - car.h/2, car.w, car.h);
+  currentBg = bgImg2;
+  player.x = canvas.width / 2;
+  player.y = canvas.height / 2;
 
-    // вікна
-    ctx.fillStyle = '#90caf9';
-    ctx.fillRect(car.x - car.w/4, car.y - car.h/2 + 10, car.w/2, car.h/3);
-
-    // колеса
-    ctx.fillStyle = '#000';
-    ctx.fillRect(car.x - car.w/2 + 10, car.y + car.h/2 - 10, 25, 10);
-    ctx.fillRect(car.x + car.w/2 - 35, car.y + car.h/2 - 10, 25, 10);
-
-    // поліція
-    if(car.type==='police'){
-      car.sirenPhase += 0.1;
-      ctx.fillStyle = Math.sin(car.sirenPhase) > 0 ? 'red' : 'blue';
-      ctx.fillRect(car.x - 10, car.y - car.h/2 - 10, 20, 8);
-    }
-
-    // вантажівка
-    if(car.type==='truck'){
-      ctx.fillStyle = '#333';
-      ctx.fillRect(car.x + car.w/4, car.y - car.h/2, car.w/4, car.h);
-    }
-  });
-
-  // Гравець
-  if(carImg.complete){
-    if(!player.invulnerable || Math.floor(player.invulnerableTime / 10) % 2 === 0){
-      ctx.drawImage(carImg, player.x - player.w/2, player.y - player.h/2, player.w, player.h);
-    }
-  } else {
-    ctx.fillStyle = '#00ff00';
-    ctx.fillRect(player.x - player.w/2, player.y - player.h/2, player.w, player.h);
-  }
-
-  if(player.hasShield){
-    const alpha = player.shieldTime / 60;
-    ctx.strokeStyle = `rgba(0, 150, 255, ${alpha})`;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.w/2 + 20, 0, Math.PI*2);
-    ctx.stroke();
-    
-    ctx.strokeStyle = `rgba(100, 200, 255, ${alpha * 0.5})`;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.w/2 + 15, 0, Math.PI*2);
-    ctx.stroke();
-  }
-
-  // Прогрес рівня
-  const progressPercent = (carLevelDistance / CAR_LEVEL_WIN_DISTANCE) * 100;
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(canvas.width - 220, 20, 200, 30);
-  ctx.fillStyle = '#00ff00';
-  ctx.fillRect(canvas.width - 220, 20, 200 * (progressPercent / 100), 30);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(canvas.width - 220, 20, 200, 30);
-  
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 16px Arial';
-  ctx.fillText(`${Math.floor(progressPercent)}%`, canvas.width - 120, 40);
-
-  // Вибухи
-  explosions.forEach((ex,i)=>{
-    ex.frame++;
-    ctx.fillStyle=`rgba(255,100,0,${1-ex.frame/30})`;
-    ctx.beginPath();
-    ctx.arc(ex.x,ex.y,ex.frame*3,0,Math.PI*2);
-    ctx.fill();
-    if(ex.frame>30) explosions.splice(i,1);
-  });
+  carFinishSpeed = 8;
+  carFinishAngle = 0;
+  carLevelDistance = 0;
 }
 
 
@@ -1022,6 +872,7 @@ function drawBoss(){
     ctx.strokeStyle=`rgba(255, 50, 50, ${chargeAlpha * 0.7})`;
     ctx.lineWidth=8;
     ctx.beginPath();
+
     ctx.arc(boss.x, boss.y, chargeRadius, 0, Math.PI * 2);
     ctx.stroke();
     
@@ -1125,7 +976,39 @@ function drawBoss(){
     ctx.setLineDash([]);
   }
 }
+canvas.addEventListener('mousedown', e => {
+  if (!gameStarted || isPaused) return;
 
+  // 🚗 ГУДОК
+  if (isCarLevel) {
+    if (carLevelStarted && !hornCooldown) {
+      hornCooldown = true;
+      hornSound.currentTime = 0;
+      hornSound.play().catch(() => {}); // Ігноруємо помилку, якщо файлу немає
+      hornPulse = 20;
+      setTimeout(() => hornCooldown = false, 400);
+    }
+    return; // Стрільба заборонена в машині
+  }
+
+  // 🔫 СТРІЛЬБА
+  if (!canShoot) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const angle = Math.atan2(my - player.y, mx - player.x);
+
+  bullets.push({
+    x: player.x,
+    y: player.y,
+    dx: Math.cos(angle) * 5,
+    dy: Math.sin(angle) * 5
+  });
+
+  canShoot = false;
+  setTimeout(() => canShoot = true, shootCooldown);
+});
 function drawCarLevel(){
   ctx.fillStyle = '#555';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1214,128 +1097,161 @@ function drawCarLevel(){
   ctx.fill();
   if(ex.frame>30) explosions.splice(i,1);
 });
+if (hornPulse > 0) {
+  ctx.strokeStyle = `rgba(255, 200, 0, ${hornPulse / 20})`;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, hornPulse * 3, 0, Math.PI * 2);
+  ctx.stroke();
+  hornPulse--;
+}
 }
 
-function update(){
-  if(!gameStarted||isPaused) return;
+function update(delta){
+  if(!gameStarted || isPaused) return;
+
+  const dt = delta * 60; // нормалізація швидкості
 
   if(isCarLevel){
-    updateCarLevel();
+    updateCarLevel(delta);
     return;
   }
 
+  // ===== Таймери =====
   if(player.hasShield){
-    player.shieldTime--;
+    player.shieldTime -= dt;
     if(player.shieldTime <= 0){
       player.hasShield = false;
     }
   }
   
   if(player.invulnerable){
-    player.invulnerableTime--;
+    player.invulnerableTime -= dt;
     if(player.invulnerableTime <= 0){
       player.invulnerable = false;
     }
   }
 
-  if(keys['a']||keys['A']||keys['ArrowLeft']) player.x-=player.speed;
-  if(keys['d']||keys['D']||keys['ArrowRight']) player.x+=player.speed;
-  if(keys['w']||keys['W']||keys['ArrowUp']) player.y-=player.speed;
-  if(keys['s']||keys['S']||keys['ArrowDown']) player.y+=player.speed;
+  // ===== Рух гравця =====
+  if(keys['a']||keys['A']||keys['ArrowLeft']) player.x -= player.speed * dt;
+  if(keys['d']||keys['D']||keys['ArrowRight']) player.x += player.speed * dt;
+  if(keys['w']||keys['W']||keys['ArrowUp']) player.y -= player.speed * dt;
+  if(keys['s']||keys['S']||keys['ArrowDown']) player.y += player.speed * dt;
 
+  // ===== Горизонтальні межі =====
   if(currentBg !== bgImg3 || !bossActive){
-    if(player.x<-player.w) player.x=canvas.width;
-    if(player.x>canvas.width) player.x=-player.w;
+    if(player.x < -player.w) player.x = canvas.width;
+    if(player.x > canvas.width) player.x = -player.w;
   } else {
     if(player.x < player.w/2) player.x = player.w/2;
-    if(player.x > canvas.width - player.w/2) player.x = canvas.width - player.w/2;
+    if(player.x > canvas.width - player.w/2)
+      player.x = canvas.width - player.w/2;
   }
 
-  if(currentBg===bgImg1){
+  // ===== ЛОКАЦІЯ 1 =====
+  if(currentBg === bgImg1){
     if(player.y > canvas.height){
-      if(bgImg2.complete && bgImg2.naturalWidth>0){
-        currentBg=bgImg2; 
-        player.y=player.h/2; 
-        spawnEnemies();
-        activateShield();
-      }
-    }
+      currentBg = bgImg2;
+      player.y = player.h/2;
+      spawnEnemies();
+      activateShield();
+    } 
     else if(player.y < -player.h){
-      player.y=canvas.height;
+      player.y = canvas.height;
     }
   }
-  
-  else if(currentBg===bgImg2){
-    if(defeatedEnemies.length===2){
+
+  // ===== ЛОКАЦІЯ 2 =====
+  else if(currentBg === bgImg2){
+    if(defeatedEnemies.length === 2){
       if(player.y < -player.h){
-        currentBg=bgImg1; 
-        player.y=canvas.height-player.h/2; 
-        enemies=[];
+        currentBg = bgImg1;
+        player.y = canvas.height - player.h/2;
+        enemies = [];
         activateShield();
       }
       else if(player.y > canvas.height){
         goToThirdLocation();
       }
-    } 
-    else {
-      if(player.y < -player.h) player.y=canvas.height;
-      else if(player.y > canvas.height) player.y=-player.h;
+    } else {
+      if(player.y < -player.h) player.y = canvas.height;
+      if(player.y > canvas.height) player.y = -player.h;
     }
   }
-  
-  else if(currentBg===bgImg3){
+
+  // ===== ЛОКАЦІЯ 3 =====
+  else if(currentBg === bgImg3){
     if(bossActive){
       if(player.y < player.h/2) player.y = player.h/2;
-      if(player.y > canvas.height - player.h/2) player.y = canvas.height - player.h/2;
+      if(player.y > canvas.height - player.h/2)
+        player.y = canvas.height - player.h/2;
     } else {
       if(player.y > canvas.height){
         goToCarLevel();
-      } else {
-        if(player.y < -player.h) player.y=canvas.height;
+      }
+      else if(player.y < -player.h){
+        player.y = canvas.height;
       }
     }
-    
-    updateBoss();
-  }
-  
-  else {
-    if(player.y < -player.h) player.y=canvas.height;
-    else if(player.y > canvas.height) player.y=-player.h;
+
+    updateBoss(delta);
   }
 
-  for(let i=bullets.length-1;i>=0;i--){
-    let b=bullets[i]; b.x+=b.dx; b.y+=b.dy;
-    
-    if(b.x<0 || b.x>canvas.width || b.y<0 || b.y>canvas.height){
+  // ===== ІНШІ =====
+  else {
+    if(player.y < -player.h) player.y = canvas.height;
+    if(player.y > canvas.height) player.y = -player.h;
+  }
+
+  // ===== КУЛІ =====
+  for(let i = bullets.length - 1; i >= 0; i--){
+    let b = bullets[i];
+    b.x += b.dx * dt;
+    b.y += b.dy * dt;
+
+    if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height){
       bullets.splice(i,1);
       continue;
     }
-    
-    for(let j=0;j<enemies.length;j++){
-      let e=enemies[j];
-      if(b.x>e.x-e.w/2 && b.x<e.x+e.w/2 && b.y>e.y-e.h/2 && b.y<e.y+e.h/2){
-        e.hp--; bullets.splice(i,1);
-        if(e.hp<=0){
-          defeatedEnemies.push(e.id); enemies.splice(j,1);
+
+    for(let j = 0; j < enemies.length; j++){
+      let e = enemies[j];
+      if(
+        b.x > e.x - e.w/2 &&
+        b.x < e.x + e.w/2 &&
+        b.y > e.y - e.h/2 &&
+        b.y < e.y + e.h/2
+      ){
+        e.hp--;
+        bullets.splice(i,1);
+        if(e.hp <= 0){
+          defeatedEnemies.push(e.id);
+          enemies.splice(j,1);
         }
         break;
       }
     }
   }
 
+  // ===== ВОРОГИ =====
   enemies.forEach(e=>{
-    const angle=Math.atan2(player.y-e.y, player.x-e.x);
-    e.x+=Math.cos(angle)*2; e.y+=Math.sin(angle)*2;
+    const angle = Math.atan2(player.y - e.y, player.x - e.x);
+    e.x += Math.cos(angle) * 2 * dt;
+    e.y += Math.sin(angle) * 2 * dt;
+
     if(!player.hasShield){
-      if(player.x+player.w/2>e.x-e.w/2 &&
-         player.x-player.w/2<e.x+e.w/2 &&
-         player.y+player.h/2>e.y-e.h/2 &&
-         player.y-player.h/2<e.y+e.h/2){
+      if(
+        player.x + player.w/2 > e.x - e.w/2 &&
+        player.x - player.w/2 < e.x + e.w/2 &&
+        player.y + player.h/2 > e.y - e.h/2 &&
+        player.y - player.h/2 < e.y + e.h/2
+      ){
         showGameOver();
       }
     }
   });
 }
+
 
 function draw(){
   if(isCarLevel){
@@ -1388,58 +1304,22 @@ function draw(){
   
   drawBoss();
 }
-function carSignal(){
-  const signalDuration = 300; // тривалість сигналу в мс
-  const signalRadius = 30; // радіус сигналу над машиною
 
-  let signalStart = performance.now();
-
-  function drawSignal(timestamp){
-    if(timestamp - signalStart > signalDuration) return; // завершити сигнал
-
-    // малюємо сигнал над машиною
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = 'red';
-    ctx.beginPath();
-    ctx.arc(player.x, player.y - player.h/2, signalRadius, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = 'blue';
-    ctx.beginPath();
-    ctx.arc(player.x, player.y - player.h/2, signalRadius/2, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-
-    requestAnimationFrame(drawSignal);
-  }
-
-  requestAnimationFrame(drawSignal);
-}
-
-// Зміна події кліку для стрільби
-canvas.addEventListener('click', e=>{
-  if(!gameStarted||isPaused||!canShoot||isCarLevel) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-  const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
-
-  bullets.push({ x: player.x, y: player.y, dx: Math.cos(angle)*5, dy: Math.sin(angle)*5 });
-
-  // ✅ Викликаємо сигнал машини
-  carSignal();
-
-  canShoot = false;
-  setTimeout(()=>{ canShoot = true; }, shootCooldown);
-});
 const images=[bgImg1,bgImg2,bgImg3,bgImg4,playerImg1,playerImg2,playerImg3,playerImg3Damaged,carImg,enemyImg,bossImg1,bossImg2,deathImgBoss];
 let loaded=0;
 function checkAllLoaded(){ loaded++; if(loaded===images.length){ gameStarted=true; loop(); } }
 images.forEach(img=>{ img.onload=checkAllLoaded; img.onerror=checkAllLoaded; });
 setTimeout(()=>{ if(!gameStarted){ gameStarted=true; loop(); } },1000);
 
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
+function loop(time) {
+  const delta = (time - lastTime) / 1000; // секунди
+  lastTime = time;
+
+  update(delta);
+  draw();
+
+  requestAnimationFrame(loop);
+}
 </script>
 </body>
 </html>
