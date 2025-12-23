@@ -255,6 +255,7 @@ let roadCars = [];
 let carLevelDistance = 0;
 let carLevelStarted = false;
 let carCountdown = 3;
+let carLevelFinished = false;
 const CAR_LEVEL_WIN_DISTANCE = 30000;
 
 // Кулдаун стрільби
@@ -981,7 +982,7 @@ canvas.addEventListener('mousedown', e => {
 
   // 🚗 ГУДОК
   if (isCarLevel) {
-    if (carLevelStarted && !hornCooldown) {
+    if (!hornCooldown) {
       hornCooldown = true;
       hornSound.currentTime = 0;
       hornSound.play().catch(() => {}); // Ігноруємо помилку, якщо файлу немає
@@ -1113,7 +1114,7 @@ function update(delta){
   const dt = delta * 60; // нормалізація швидкості
 
   if(isCarLevel){
-    updateCarLevel(delta);
+    updateCarLevel(dt);
     return;
   }
 
