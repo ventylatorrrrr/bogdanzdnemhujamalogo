@@ -177,13 +177,13 @@
 <script>
 let carFinishAngle = 0;
 let carFinishSpeed = 8;
-let carSpeed = 10;
+let carSpeed = 15;
   const hornSound = new Audio('horn.mp3');
 hornSound.volume = 0.6;
 hornSound.preload = 'auto';
 let hornCooldown = false;
 let hornPulse = 0;
-  let lastTime = performance.now();
+  let lastTime = 0;
   let carFinishAnimation = false;
   let explosions = [];
 const canvas = document.getElementById('game');
@@ -224,7 +224,7 @@ const player = {
   x:400, y:300, 
   w:128, h:128,
   hitboxW: 80, hitboxH: 80,
-  speed:5, 
+  speed:8, 
   hasShield:false, shieldTime:0,
   hp: 1,
   maxHp: 1,
@@ -821,30 +821,49 @@ function updateBoss(){
 }
 
 // Оновлення авто рівня
-function updateCarLevel() {
-  carLevelDistance += carSpeed;
+function updateCarLevel(dt) {
+  // Рух дороги
+  carScrollOffset += carSpeed * dt;
+
+  // Рух інших машин
+  roadCars.forEach(car => {
+    car.x -= (carSpeed - car.speed) * dt;
+    
+    // Респавн машин
+    if (car.x < -200 && !carFinishAnimation) {
+      car.x = canvas.width + 200 + Math.random() * 500;
+      car.y = Math.random() * (canvas.height - 250) + 120;
+      car.speed = 3 + Math.random() * 4;
+    }
+  });
 
   if (!carFinishAnimation) {
-    if (keys.ArrowLeft) player.x -= 4;
-    if (keys.ArrowRight) player.x += 4;
-  }
+    carLevelDistance += carSpeed * dt;
 
-  player.x = Math.max(60, Math.min(canvas.width - 60, player.x));
+    // Керування
+    const moveSpeed = 9 * dt;
+    if (keys.ArrowLeft || keys.a || keys.A) player.x -= moveSpeed;
+    if (keys.ArrowRight || keys.d || keys.D) player.x += moveSpeed;
+    if (keys.ArrowUp || keys.w || keys.W) player.y -= moveSpeed;
+    if (keys.ArrowDown || keys.s || keys.S) player.y += moveSpeed;
 
-  if (carLevelDistance >= CAR_LEVEL_WIN_DISTANCE) {
-    carFinishAnimation = true;
-  }
+    player.x = Math.max(60, Math.min(canvas.width - 60, player.x));
+    player.y = Math.max(100, Math.min(canvas.height - 100, player.y));
 
-  // 🔥 ФІНІШ (ВАРІАНТ A)
-  if (carFinishAnimation) {
-    player.x += Math.cos(carFinishAngle) * carFinishSpeed;
-    player.y += Math.sin(carFinishAngle) * carFinishSpeed;
+    if (carLevelDistance >= CAR_LEVEL_WIN_DISTANCE) {
+      carFinishAnimation = true;
+      carLevelFinished = false;
+    }
+  } else {
+    // Анімація фінішу
+    carSpeed *= 0.97;
+    const targetY = canvas.height - 150;
+    player.y += (targetY - player.y) * 0.05 * dt;
 
-    carFinishAngle += 0.02;
-    carFinishSpeed *= 0.96;
-
-    if (carFinishSpeed < 0.4) {
-      finishCarLevel();
+    if (carSpeed < 0.5 && !carLevelFinished) {
+      carSpeed = 0;
+      carLevelFinished = true;
+      setTimeout(finishCarLevel, 1500);
     }
   }
 }
@@ -1308,15 +1327,16 @@ function draw(){
 
 const images=[bgImg1,bgImg2,bgImg3,bgImg4,playerImg1,playerImg2,playerImg3,playerImg3Damaged,carImg,enemyImg,bossImg1,bossImg2,deathImgBoss];
 let loaded=0;
-function checkAllLoaded(){ loaded++; if(loaded===images.length){ gameStarted=true; loop(); } }
+function checkAllLoaded(){ loaded++; if(loaded===images.length){ gameStarted=true; requestAnimationFrame(loop); } }
 images.forEach(img=>{ img.onload=checkAllLoaded; img.onerror=checkAllLoaded; });
-setTimeout(()=>{ if(!gameStarted){ gameStarted=true; loop(); } },1000);
+setTimeout(()=>{ if(!gameStarted){ gameStarted=true; requestAnimationFrame(loop); } },1000);
 
 function loop(time) {
-  const delta = (time - lastTime) / 1000; // секунди
+  if(!lastTime) lastTime = time;
+  const delta = (time - lastTime) / 1000;
   lastTime = time;
 
-  update(delta);
+  if(delta < 0.1) update(delta); // Захист від лагів
   draw();
 
   requestAnimationFrame(loop);
