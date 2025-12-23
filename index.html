@@ -177,7 +177,7 @@
 <script>
 let carFinishAngle = 0;
 let carFinishSpeed = 8;
-let carSpeed = 15;
+let carSpeed = 30;
   const hornSound = new Audio('horn.mp3');
 hornSound.volume = 0.6;
 hornSound.preload = 'auto';
@@ -224,7 +224,7 @@ const player = {
   x:400, y:300, 
   w:128, h:128,
   hitboxW: 80, hitboxH: 80,
-  speed:8, 
+  speed:15, 
   hasShield:false, shieldTime:0,
   hp: 1,
   maxHp: 1,
@@ -378,7 +378,7 @@ function spawnBoss(){
     attackTimer: 180,
     warningTimer: 0,
     moveAngle: 0,
-    moveSpeed: 0.5,
+    moveSpeed: 3,
     jumpTarget: {x:0, y:0},
     jumpProgress: 0,
     jumpStartX: 0,
@@ -676,8 +676,8 @@ function updateBoss(){
           bossProjectiles.push({
             x: boss.x,
             y: boss.y,
-            dx: Math.cos(angle) * 2.5,
-            dy: Math.sin(angle) * 2.5,
+            dx: Math.cos(angle) * 8,
+            dy: Math.sin(angle) * 8,
             radius: 12
           });
         }
@@ -841,7 +841,7 @@ function updateCarLevel(dt) {
     carLevelDistance += carSpeed * dt;
 
     // Керування
-    const moveSpeed = 9 * dt;
+    const moveSpeed = 15 * dt;
     if (keys.ArrowLeft || keys.a || keys.A) player.x -= moveSpeed;
     if (keys.ArrowRight || keys.d || keys.D) player.x += moveSpeed;
     if (keys.ArrowUp || keys.w || keys.W) player.y -= moveSpeed;
@@ -1022,8 +1022,8 @@ canvas.addEventListener('mousedown', e => {
   bullets.push({
     x: player.x,
     y: player.y,
-    dx: Math.cos(angle) * 5,
-    dy: Math.sin(angle) * 5
+    dx: Math.cos(angle) * 20,
+    dy: Math.sin(angle) * 20
   });
 
   canShoot = false;
@@ -1256,8 +1256,8 @@ function update(delta){
   // ===== ВОРОГИ =====
   enemies.forEach(e=>{
     const angle = Math.atan2(player.y - e.y, player.x - e.x);
-    e.x += Math.cos(angle) * 2 * dt;
-    e.y += Math.sin(angle) * 2 * dt;
+    e.x += Math.cos(angle) * 6 * dt;
+    e.y += Math.sin(angle) * 6 * dt;
 
     if(!player.hasShield){
       if(
